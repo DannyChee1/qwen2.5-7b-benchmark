@@ -12,4 +12,6 @@ echo "vllm stops at $(date -u -d @$((now + cap)) '+%H:%M UTC'), in $((cap / 60))
 
 source ~/vllm-env/bin/activate
 vllm --version
-timeout --signal=INT --kill-after=60 "$cap" vllm serve "$MODEL" --host 127.0.0.1 --port 8000 || [ $? -eq 124 ]
+HF_HUB_OFFLINE=1 timeout --signal=INT --kill-after=60 "$cap" \
+  vllm serve "$MODEL" --host 127.0.0.1 --port 8000 \
+  --disable-access-log-for-endpoints /health,/metrics,/v1/models || [ $? -eq 124 ]
