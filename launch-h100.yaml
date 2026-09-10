@@ -1,0 +1,20 @@
+# Launch and tear down:
+# sky launch -c $USER-launch launch-h100.yaml
+# sky down $USER-launch
+
+name: launch-h100
+
+resources:
+  infra: nebius
+  accelerators: H100:1
+  autostop:
+    idle_minutes: 60
+    down: true
+    wait_for: jobs_and_ssh
+
+run: |
+  nvidia-smi
+  # serve.yaml wants docker compose for Prometheus + Grafana; learn now whether the image ships it.
+  docker --version && docker compose version || echo "NO DOCKER on this image"
+  df -h / | tail -1
+  python -c 'print("Launched H100 on Nebius")'
