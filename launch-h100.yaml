@@ -14,7 +14,6 @@ resources:
 
 run: |
   nvidia-smi
-  # serve.yaml wants docker compose for Prometheus + Grafana; learn now whether the image ships it.
   docker --version && docker compose version || echo "NO DOCKER on this image"
   df -h / | tail -1
   python -c 'print("Launched H100 on Nebius")'

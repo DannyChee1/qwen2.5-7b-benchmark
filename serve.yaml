@@ -1,0 +1,27 @@
+# sky launch -c $USER-serve serve.yaml [--env MODEL=...]
+#   Qwen/Qwen2.5-7B-Instruct            default
+#   mistralai/Mistral-7B-Instruct-v0.3  2.3x the KV per token, fills the cache inside the sweep
+# To switch on a running cluster: sky cancel $USER-serve -a, then launch again.
+# ssh -N -L 8000:localhost:8000 -L 3000:localhost:3000 -L 9090:localhost:9090 $USER-serve
+
+name: serve
+
+envs:
+  MODEL: Qwen/Qwen2.5-7B-Instruct
+  MAX_HOURS: "8"
+  DEADLINE_TZ: America/New_York
+  DEADLINE_HHMM: "18:00"
+
+resources:
+  infra: nebius
+  accelerators: H100:1
+  autostop:
+    idle_minutes: 30
+    down: true
+    wait_for: jobs
+
+workdir: .
+
+setup: bash scripts/setup.sh
+
+run: bash scripts/serve.sh
