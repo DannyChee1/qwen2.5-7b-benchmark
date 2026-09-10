@@ -11,7 +11,8 @@ envs:
   IN_LEN: "512"
   OUT_LEN: "128"
   DURATION_S: "180"
-  MULT: "8"
+  STEP_S: "60"
+  PEAK_RPS: "60"
   TAG: ""
 
 workdir: .
