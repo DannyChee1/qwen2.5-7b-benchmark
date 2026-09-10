@@ -1,0 +1,19 @@
+# sky exec $USER-serve bench.yaml --env MODE=closed [--env CS="64"]
+# sky exec $USER-serve bench.yaml --env MODE=open --env RS="2 4 6 8 10"
+# rsync -avz $USER-serve:results/ results/
+
+name: bench
+
+envs:
+  MODE: closed
+  CS: "1 2 4 8 16 32 64 128 256 512 1024"
+  RS: ""
+  IN_LEN: "512"
+  OUT_LEN: "128"
+  DURATION_S: "180"
+  MULT: "8"
+  TAG: ""
+
+workdir: .
+
+run: bash scripts/bench.sh
