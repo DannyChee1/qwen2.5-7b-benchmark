@@ -1,3 +1,5 @@
 tasks/
 *.md
 sky-env/
+!README.md
+.DS_Store
