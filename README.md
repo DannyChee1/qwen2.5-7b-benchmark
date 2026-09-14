@@ -46,11 +46,17 @@ Throughput climbs steeply up to C=128, then flattens: doubling to 256 adds 8 req
 p95 TTFT crosses the 500 ms bound at C=64, and p95 TPOT crosses the 50 ms bound at C=512.
 Past C=128 both curves turn upward while throughput barely moves.
 
-**Pool size.** A fixed pool of N workers is this closed loop with C=N, so the sweep answers the question directly.
+**Pool size.** If each worker keeps one request in flight and sends the next as soon as one comes back, a pool of N workers is exactly the closed loop above with C=N.
+So the table already answers the question.
+The only thing left to choose is what the pipeline is for.
 
-- Throughput pipeline, where nobody waits on a single request: set the pool to 256. It delivers 59 req/s, 95% of the ceiling. Doubling to 512 adds 2 req/s and doubles the end-to-end latency of every request, from 4.3 s to 8.2 s.
-- Interactive pipeline that must hold p95 TTFT under 500 ms and p95 TPOT under 50 ms: set the pool to 32. It is the largest measured size that passes, at 27 req/s. 64 already misses the TTFT bound at 624 ms, and the edge between 32 and 64 was not swept finer.
-- Do not go above 256. Mean end-to-end latency in a closed loop is C divided by throughput, so once throughput is flat each added worker adds about 16 ms to every request and no throughput. At C=1024 the mean request takes 16 s.
+- **Throughput pipeline.** Nobody is waiting on any one request, you just want the batch done. Use 256 workers. That gets 59 req/s, about 95% of the ceiling.
+- **Interactive pipeline.** Every request has to stay under 500 ms p95 TTFT and 50 ms p95 TPOT. Use 32 workers. It is the biggest size we measured that passes, at 27 req/s. At 64 the TTFT bound is already blown at 624 ms. We did not sweep between 32 and 64, so the real limit may sit a little above 32.
+
+Going past 256 workers is wasteful, you have to wait more.
+Once throughput has flattened, every extra worker adds about 16 ms to every request in flight and nothing to throughput.
+Doubling from 256 to 512 gets 2 more req/s and takes the average request from 4.3 s to 8.3 s.
+At 1024 the average request takes 16 s.
 
 ## 2. Open loop: find what it can actually serve
 
@@ -59,7 +65,6 @@ Past C=128 both curves turn upward while throughput barely moves.
 **SLO**: p95 TTFT <= 500 ms, p95 TPOT <= 50 ms, and every request completes.
 
 **Method.** Requests arrive as a Poisson process at a fixed rate R with no concurrency cap, 180 s per point.
-Arrivals do not wait for the server, which makes this the only load pattern that measures the tail honestly.
 
 | R req/s | served req/s | TTFT p95 | TPOT p95 | SLO |
 |---|---|---|---|---|
@@ -86,13 +91,13 @@ Right: achieved throughput tracks the offered rate up to the 62.5 req/s ceiling,
   <img src="screenshots/open/open-ttft.png" width="48.4%" alt="TTFT percentiles during the open-loop sweep">
 </p>
 
-Throughput tracks the offered rate step for step, and TTFT p95 stays under 300 ms through 56 req/s. The jump at the right edge is the start of the 63 req/s point.
+Throughput follows the offered rate step for step, and TTFT p95 stays under 300 ms through 56 req/s. The spike at the right edge is the 63 req/s point starting.
 
 **Findings.**
 
-- One H100 serves 56 req/s within the SLO. At 63 req/s, just under the ceiling, every bound breaks at once: TTFT p95 jumps to 1.1 s, TPOT p95 to 124 ms, and 2 requests fail. At 70 req/s the server tops out at 63 req/s and the queue grows without bound, so open loop puts the ceiling in the same place as closed loop.
-- Autoscaling: add a replica when the smoothed per-replica request rate exceeds 0.7 times the highest passing rate, about 39 req/s here, for two minutes. A non-empty queue is the leading indicator.
-- The answer is higher than the closed-loop sweep implied. At about 40 req/s, open-loop p95 TTFT is 74 ms against 624 ms in closed loop. Closed-loop clients with identical request lengths move in lockstep, so every prompt queues behind C-1 others for prefill. Poisson arrivals spread prefill out over time.
+- **One H100 serves 56 req/s inside the SLO.** At 63 req/s, just under the ceiling, everything breaks at once: TTFT p95 jumps to 1.1 s, TPOT p95 to 124 ms, and 2 requests fail. At 70 req/s the server tops out at 63 req/s and the queue grows without bound, the same ceiling the closed loop found.
+- **Autoscale at 70% of that.** Add a replica when a replica's smoothed request rate stays above 39 req/s for two minutes. Requests piling up in the waiting queue are the earliest warning.
+- **Real traffic does better than the closed loop suggested.** At about 40 req/s, p95 TTFT is 74 ms open loop and 624 ms closed loop. Closed-loop clients send identical requests in lockstep, so every prompt queues behind C-1 others for prefill. Poisson arrivals spread prefill out over time.
 
 <p>
   <img src="plots/closed-vs-open.png" width="49%" alt="Closed against open loop: p95 TTFT and p95 TPOT at the same achieved throughput">
